@@ -30,4 +30,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define TAPPING_FORCE_HOLD
 #define TAPPING_TERM 100
 
+// Responsive WPM Configuration
+#define WPM_SAMPLE_SECONDS 2           // 2-second window instead of 5 (faster response)
+#define WPM_SAMPLE_PERIODS 40          // 50ms periods instead of 200ms (smoother)
+#define WPM_LAUNCH_CONTROL             // Immediate WPM response from 0
+#define WPM_UNFILTERED                 // Remove extra smoothing lag
+
 

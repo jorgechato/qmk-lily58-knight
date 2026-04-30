@@ -104,10 +104,10 @@ layer_state_t layer_state_set_user(layer_state_t state) {
 #ifdef OLED_ENABLE
 // OLED setup
 #define IDLE_FRAMES 5
-#define IDLE_SPEED 20
+#define IDLE_SPEED 20        // Reduced from 30 for faster response
 #define TAP_FRAMES 2
-#define TAP_SPEED 25
-#define ANIM_FRAME_DURATION 16
+#define TAP_SPEED 25         // Reduced from 40 for quicker activation
+#define ANIM_FRAME_DURATION 16  // Ultra: 60 FPS (was 200ms/5 FPS)
 #define ANIM_SIZE 512
 
 char wpm_str[10];
@@ -118,11 +118,11 @@ uint8_t current_tap_frame = 0;
 
 static long int oled_timeout = 600000; // 10 minutes
 
-// oled_rotation_t oled_init_user(oled_rotation_t rotation) {
-//   if (!is_keyboard_master())
-//     return OLED_ROTATION_180;  // flips the display 180 degrees if offhand
-//   return rotation;
-// }
+oled_rotation_t oled_init_user(oled_rotation_t rotation) {
+  if (is_keyboard_master())
+    return OLED_ROTATION_270;  // flips the display 180 degrees if offhand
+  return rotation;
+}
 
 // Bongo Cat animation, because why not
 static void render_anim(void) {
@@ -229,27 +229,63 @@ static void render_anim(void) {
 
 
 
-// // Minimal OLED implementation to save space
+// Clean WPM-focused OLED display with text inversion
+void render_status_master(void) {
+    // Real-time WPM display with emphasis
+    uint8_t current_wpm = get_current_wpm();
+
+    // WPM header
+    oled_write_P(PSTR(" WPM \n"), false);
+
+    if (current_wpm >= 100) {
+        snprintf(wpm_str, sizeof(wpm_str), " %3d \n\n\n", current_wpm);
+    } else if (current_wpm >= 10) {
+        snprintf(wpm_str, sizeof(wpm_str), "  %2d \n\n\n", current_wpm);
+    } else {
+        snprintf(wpm_str, sizeof(wpm_str), "   %d \n\n\n", current_wpm);
+    }
+    oled_write(wpm_str, false);
+
+    // Status indicator with progressive inversion
+    if (current_wpm == 0) {
+        oled_write_P(PSTR("\n\n"), false);
+    } else if (current_wpm < 20) {
+        oled_write_P(PSTR("Warm \n\n"), false);
+    } else if (current_wpm < 40) {
+        oled_write_P(PSTR("Good \n\n"), false);
+    } else if (current_wpm < 60) {
+        oled_write_P(PSTR("Fast \n\n"), false);
+    } else {
+        oled_write_P(PSTR("Turbo\n\n"), true);   // High emphasis for blazing speed
+    }
+
+    // Dynamic activity indicator with speed-based styling
+    static bool activity_blink = false;
+
+    if (current_wpm > 0) {
+        // Faster blinking for higher WPM (more responsive visual feedback)
+        uint32_t blink_speed = 200 - (current_wpm * 2);  // Faster blink = higher WPM
+        if (blink_speed < 50) blink_speed = 50;  // Minimum blink speed
+
+        if (timer_elapsed32(anim_timer) > blink_speed) {
+            activity_blink = !activity_blink;
+        }
+
+        // Different indicators based on WPM range
+        if (current_wpm >= 80) {
+            oled_write_P(activity_blink ? PSTR(">>>>\n") : PSTR("=====\n"), false);
+        } else if (current_wpm >= 60) {
+            oled_write_P(activity_blink ? PSTR(">> <<\n") : PSTR("== ==\n"), false);
+        } else {
+            oled_write_P(activity_blink ? PSTR(" > <\n") : PSTR(" = =\n"), false);
+        }
+    } else {
+    }
+}
+
 bool oled_task_user(void) {
   if (is_keyboard_master()) {
-    // Display layer info
-    oled_write_P(PSTR("Layer: "), false);
-    switch (get_highest_layer(layer_state)) {
-        case _QWERTY:
-            oled_write_P(PSTR("Base\n"), false);
-            break;
-        case _LOWER:
-            oled_write_P(PSTR("Lower\n"), false);
-            break;
-        case _RAISE:
-            oled_write_P(PSTR("Raise\n"), false);
-            break;
-        case _ADJUST:
-            oled_write_P(PSTR("Adjust\n"), false);
-            break;
-        default:
-            oled_write_P(PSTR("Undef\n"), false);
-    }
+    render_status_master();
   } else {
     render_anim();
   }
